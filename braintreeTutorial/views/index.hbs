@@ -1,0 +1,81 @@
+<div id="dropin-wrapper">
+  <div id="refund-message"></div>
+  <div id="checkout-message"></div>
+  <div id="dropin-container"></div>
+  <button id="submit-button">Submit payment</button>
+</div>
+<script>
+  var checkoutbutton = document.querySelector('#submit-button');
+
+  braintree.dropin.create({
+    // Insert your tokenization key here
+    authorization: 'sandbox_zj5s8x4g_rppzycv6vk7qspvm',
+    container: '#dropin-container'
+  }, function (createErr, instance) {
+    checkoutbutton.addEventListener('click', function () {
+      instance.requestPaymentMethod(function (requestPaymentMethodErr, payload) {
+        // When the user clicks on the 'Submit payment' button this code will send the
+        // encrypted payment information in a variable called a payment method nonce
+        $.ajax({
+          type: 'POST',
+          url: '/checkout',
+          data: {'paymentMethodNonce': payload.nonce}
+        }).done(function(result) {
+          // Tear down the Drop-in UI
+          instance.teardown(function (teardownErr) {
+            if (teardownErr) {
+              console.error('Could not tear down Drop-in UI!');
+            } else {
+              console.info('Drop-in UI has been torn down!');
+              // Remove the 'Submit payment' button
+              $('#submit-button').remove();
+            }
+          });
+
+          if (result.success) {
+          	console.log(result);
+          	var refundhtml = `
+          	<button id="refund-button">Refund Transaction</button>
+
+            <script> var checkoutbutton = document.querySelector("#refund-button");
+            checkoutbutton.addEventListener('click', function () {
+              $.ajax({
+                type: 'POST',
+                url: '/refund',
+                data: {'transactionid': "${result.transaction.id}"}
+              }).done(function(result) {
+                    console.info('Refund ajax done');
+                    // Remove the 'Reund payment' button
+                    $('#refund-button').remove();
+                  
+            if (result.sucess){
+              $('#checkout-message').html('<h1>Refund Successful</h1><p>Transaction successfully refunded</p>');
+
+            }
+            else{
+              console.log(result)
+              if (result.message == "Cannot refund transaction unless it is settled.")
+              $('#checkout-message').html('<h1>Transaction Stilling Settling</h1><p>Your payment is still waiting to be settled and as such cannot be refuned yet, please try again later.</p>');
+            }
+            });
+          });
+
+          <\/script>
+
+          	`
+            $('#checkout-message').html('<h1>Success</h1><p>Your Drop-in UI is working! Check your <a href="https://sandbox.braintreegateway.com/login">sandbox Control Panel</a> for your test transactions.</p><p>Transaction ID is: "'+result.transaction.id+'"</p></br>  '+refundhtml);
+          } else {
+            console.log(result);
+            if (result.message != ""){
+              $('#checkout-message').html('<h1>Error</h1><p>'+result.message+'</p>');
+            }
+            else{
+              $('#checkout-message').html('<h1>Error</h1><p>Sorry, an unknown error has occured</p>');
+            }
+            
+          }
+        });
+      });
+    });
+  });
+</script>
